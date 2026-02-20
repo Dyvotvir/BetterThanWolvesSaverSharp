@@ -4,28 +4,49 @@
 @inject BTWSaver.Config.ConfigManager _configManager
 
 <div class="scene">
-    <div class="buttons-field">
-        <div class="apply-btn-field">
-            <div class="action-btn apply-btn" @onclick="Apply">Apply</div>
-        </div>
-        
-        <div class="overwrite-btn-field">
-            <div class="action-btn overwrite-btn" @onclick="Overwrite">Overwrite</div>
-        </div>
-        
-        <div class="create-new-btn-field">
-            <div class="action-btn create-new-file-btn" @onclick="CreateNew">Create New File</div>
-        </div>
-        
-        <div class="delete-btn-field">
-            <div class="action-btn delete-btn">Delete</div>
-        </div>
-        
-        <div class="delete-all-btn-field">
-            <div class="action-btn delete-all-btn">Delete All</div>
+    <div class="main-field">
+        <div class="buttons-field">
+            <div class="btn-field apply-btn-field">
+                <div class="action-btn apply-btn" @onclick="Apply">Apply</div>
+                <div class>Confirmation menu</div>
+            </div>
+
+            <div class="btn-field overwrite-btn-field">
+                <div class="action-btn overwrite-btn" @onclick="Overwrite">Overwrite</div>
+                <div>Confirmation menu</div>
+    
+                <div style="display: flex; flex-direction: column; align-items: center; visibility: @(_progressPercentOverwrite > 0 ? "visible" : "hidden");">
+                    <div class="progress-track">
+                        <div class="progress-fill progress-fill-overwrite" style="width: @_progressPercentOverwrite%;"></div>
+                    </div>
+                    <div class="progress-text">@_progressPercentOverwrite%</div>
+                </div>
+            </div>
+            
+
+            <div class="btn-field create-new-btn-field">
+                <div class="action-btn create-new-file-btn" @onclick="CreateNew">Create New File</div>
+    
+                <div>Confirmation menu</div>
+    
+                <div style="display: flex; flex-direction: column; align-items: center; visibility: @(_progressPercentCreateNew > 0 ? "visible" : "hidden");">
+                    <div class="progress-track">
+                        <div class="progress-fill progress-fill-create-new" style="width: @_progressPercentCreateNew%;"></div>
+                    </div>
+                    <div class="progress-text">@_progressPercentCreateNew%</div>
+                </div>
+            </div>
+
+            <div class="delete-btn-field">
+                <div class="action-btn delete-btn" @onclick="DeleteLast">Delete</div>
+            </div>
+
+            <div class="delete-all-btn-field">
+                <div class="action-btn delete-all-btn" @onclick="DeleteAll">Delete All</div>
+            </div>
         </div>
     </div>
-        
+
 </div>
 
 @code {
@@ -47,15 +68,15 @@
             return;
 
         string worldToWipe = ParentLayout.ChosenSaveFilePath;
-        if (Directory.Exists(worldToWipe))
-        {
-            Directory.Delete(worldToWipe, true);
-        }
+        
+        BackupService.DeleteDirectory(worldToWipe);
         
         BackupService.UnZip(ParentLayout.ChosenSaveFilePath, GetPathToLastZipFile());
     }
 
-    private void Overwrite()
+    private int _progressPercentOverwrite = 0;
+    
+    private async Task Overwrite()
     {
         if (_lastIndex == 0) return;
 
@@ -63,19 +84,79 @@
         
         if (File.Exists(lastZipFilePath))
             File.Delete(lastZipFilePath);
+
+        var walkieTalkie = new Progress<int>(percent =>
+            {
+                _progressPercentOverwrite = percent;
+
+                InvokeAsync(StateHasChanged);
+            }
+        );
         
-        BackupService.Zip(ParentLayout.ChosenSaveFilePath, GetPathToLastZipFile());
+        await Task.Run(() =>
+        {
+            BackupService.Zip(ParentLayout.ChosenSaveFilePath, GetPathToLastZipFile(), walkieTalkie);
+        });
+        
+        _progressPercentOverwrite = 100;
+        StateHasChanged();
+        await Task.Delay(2000);
+        _progressPercentOverwrite = 0;
     }
 
-    private void CreateNew()
+    private int _progressPercentCreateNew = 0; 
+
+    private async Task CreateNew()
     {
         LoadSettings();
         string newZipFileName = (_lastIndex == 0) ? _saveFileName + ".zip" 
             : _saveFileName + " (" + (_lastIndex + 1) + ")" + ".zip";
         string pathToZipInto = Path.Combine(_configManager.ParentPath, newZipFileName);
-        
-        BackupService.Zip(ParentLayout.ChosenSaveFilePath, pathToZipInto);
+    
+        var walkieTalkie = new Progress<int>(percent => 
+        {
+            _progressPercentCreateNew = percent;
+
+            InvokeAsync(StateHasChanged); 
+        });
+
+        await Task.Run(() => 
+        {
+            BackupService.Zip(ParentLayout.ChosenSaveFilePath, pathToZipInto, walkieTalkie);
+        });
+
+        _progressPercentCreateNew = 100;
+        StateHasChanged();
+        await Task.Delay(2000);
+
         _lastIndex++;
+        _progressPercentCreateNew = 0; 
+        SaveSettings();
+    }
+
+    private void DeleteLast()
+    {
+        LoadSettings();
+        
+        if (_lastIndex == 0)
+            return;
+        
+        BackupService.DeleteFile(GetPathToLastZipFile());
+        _lastIndex--;
+        
+        SaveSettings();
+    }
+
+    private void DeleteAll()
+    {
+        LoadSettings();
+        
+        if (_lastIndex == 0)
+            return;
+        
+        BackupService.DeleteAllIn(_configManager.ParentPath, _saveFileName);
+
+        _lastIndex = 0;
 
         SaveSettings();
     }
@@ -122,18 +203,36 @@
 }
 
 <style>
-    .scene { display: flex; flex-grow: 1; flex-direction: column; justify-content: center; align-items: center; width: 100%; height: 100%; }
+    .scene { display: flex; 
+        flex-grow: 1; 
+        flex-direction: column; 
+        justify-content: center; 
+        align-items: center; 
+        width: 100%; 
+        height: 100%; }
     
-    .buttons-field {
+    .main-field {
         background-color: #1a1d20;
         width: 85%;
         height: 85%;
         border-radius: 10px;
-        
+        padding: 50px;
+    }
+    
+    .buttons-field {
+        width: 100%;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        padding: 50px;
+        height: 80%
+    }
+
+    .btn-field {
+        display: flex;
+        flex-direction: row;
+        align-items: center; 
+        align-content: space-between;
+        gap: 50px;
     }
     
     .action-btn {
@@ -147,6 +246,36 @@
         transition: all 0.2s ease;
         cursor: pointer;
         color: black;
+
+    }
+
+    .progress-track {
+        width: 150px;
+        height: 15px;
+        background-color: #000000;
+        border-radius: 10px;
+        border: 1px solid #333;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        border-radius: 10px;
+        transition: width 0.1s linear
+    }
+
+    .progress-text {
+        color: #ffffff;
+        font-size: 14px;
+        font-family: monospace;
+    }
+    
+    .progress-fill-create-new {
+        background: linear-gradient(to right, #0097ff, #02ffea);
+    }
+
+    .progress-fill-overwrite {
+        background: linear-gradient(to right, #ff8800, #ffdd02);
     }
 
     .action-btn:active {
@@ -161,6 +290,8 @@
         background-color: #00FF00FF;
         box-shadow: 0 4px 20px rgb(255, 249, 2, 0.8);
     }
+    
+    
 
     .overwrite-btn {
         background-color: #b36d1e;

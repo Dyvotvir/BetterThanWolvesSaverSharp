@@ -4,28 +4,62 @@ namespace BTWSaver.Services;
 
 public class BackupService
 {
-    public static void Zip(string targetDir, string zipFilePath)
-    {
-        string parentDir = Directory.GetParent(targetDir)?.FullName ?? throw new DirectoryNotFoundException("Parent not found.");
 
+    public static void DeleteAllIn(string targetDirectory, string saveFileName)
+    {
+        var streamOfFiles = Directory.EnumerateFiles(targetDirectory, "*", SearchOption.AllDirectories);
+        foreach (string path in streamOfFiles)
+        {
+            string currentSaveFileName = Path.GetFileName(path).ToLower();
+            string fileBase = saveFileName.ToLower();
+            bool isOriginal = currentSaveFileName.Equals($"{fileBase}.zip");
+            bool isNumbered = currentSaveFileName.StartsWith($"{fileBase} (")
+                              && currentSaveFileName.EndsWith(").zip");
+            
+            if (isOriginal || isNumbered)
+                File.Delete(path);
+        }
+    }
+
+    public static void DeleteDirectory(string targetDir)
+    {
+        if (Directory.Exists(targetDir))
+            Directory.Delete(targetDir, true);
+    }
+    
+    public static void DeleteFile(string targetFile)
+    {
+        if (File.Exists(targetFile))
+            File.Delete(targetFile);
+    }
+    
+    public static void Zip(string targetDir, string zipFilePath, IProgress<int> progress = null)
+    {
         using (ZipArchive za = ZipFile.Open(zipFilePath, ZipArchiveMode.Create))
         {
-            var streamOfFiles = Directory.EnumerateFiles(targetDir, "*", SearchOption.AllDirectories);
+            List<string> streamOfFiles = Directory.EnumerateFiles(targetDir, "*", SearchOption.AllDirectories).ToList();
+        
+            int totalFiles = streamOfFiles.Count;
+            int filesProcessed = 0;
 
             foreach (string path in streamOfFiles)
             {
-                // 1. Get the path name (using targetDir so we don't double-nest folders!)
                 string relative = Path.GetRelativePath(targetDir, path);
                 string zipEntryName = relative.Replace('\\', '/');
-
-                // 2. THE FIX: Create an empty entry in the zip
                 ZipArchiveEntry entry = za.CreateEntry(zipEntryName);
 
-                // 3. Open the file in "ReadWrite" share mode so C# ignores Minecraft's lock!
                 using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 using (Stream entryStream = entry.Open())
                 {
-                    fs.CopyTo(entryStream); // Copy the data into the zip
+                    fs.CopyTo(entryStream); 
+                }
+
+                filesProcessed++;
+                
+                if (totalFiles > 0)
+                {
+                    int percentage = (filesProcessed * 100) / totalFiles;
+                    progress?.Report(percentage); 
                 }
             }
         }
