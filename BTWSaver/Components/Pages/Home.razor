@@ -9,6 +9,12 @@
             <div class="btn-field apply-btn-field">
                 <div class="action-btn apply-btn" @onclick="Apply">Apply</div>
                 <div class>Confirmation menu</div>
+                <div style="display: flex; flex-direction: column; align-items: center; visibility: @(_progressPercentApply > 0 ? "visible" : "hidden");">
+                    <div class="progress-track">
+                        <div class="progress-fill progress-fill-apply" style="width: @_progressPercentApply%;"></div>
+                    </div>
+                    <div class="progress-text">@_progressPercentApply%</div>
+                </div>
             </div>
 
             <div class="btn-field overwrite-btn-field">
@@ -62,16 +68,35 @@
         LoadSettings();
     }
 
-    private void Apply()
+    private int _progressPercentApply = 0; 
+
+    private async Task Apply()
     {
+        _progressPercentApply = 0;
+        StateHasChanged();
+        
         if (_lastIndex == 0)
             return;
 
         string worldToWipe = ParentLayout.ChosenSaveFilePath;
+
+        var walkieTalkie = new Progress<int>(percent =>
+        {
+            _progressPercentApply = percent;
+            InvokeAsync(StateHasChanged);
+        });
         
-        BackupService.DeleteDirectory(worldToWipe);
+        await Task.Run(() =>
+        {
+            BackupService.DeleteDirectory(worldToWipe);
         
-        BackupService.UnZip(ParentLayout.ChosenSaveFilePath, GetPathToLastZipFile());
+            BackupService.UnZip(ParentLayout.ChosenSaveFilePath, GetPathToLastZipFile(), walkieTalkie);
+        });
+
+        _progressPercentApply = 100;
+        StateHasChanged();
+        await Task.Delay(1000);
+        _progressPercentApply = 0;
     }
 
     private int _progressPercentOverwrite = 0;
@@ -100,7 +125,7 @@
         
         _progressPercentOverwrite = 100;
         StateHasChanged();
-        await Task.Delay(2000);
+        await Task.Delay(1000);
         _progressPercentOverwrite = 0;
     }
 
@@ -127,7 +152,7 @@
 
         _progressPercentCreateNew = 100;
         StateHasChanged();
-        await Task.Delay(2000);
+        await Task.Delay(1000);
 
         _lastIndex++;
         _progressPercentCreateNew = 0; 
@@ -276,6 +301,10 @@
 
     .progress-fill-overwrite {
         background: linear-gradient(to right, #ff8800, #ffdd02);
+    }
+    
+    .progress-fill-apply {
+        background: linear-gradient(to right, #0d5c0c, #13ff02);
     }
 
     .action-btn:active {

@@ -65,12 +65,16 @@ public class BackupService
         }
     }
 
-    public static void UnZip(string targetDir, string zipFilePath)
+    public static void UnZip(string targetDir, string zipFilePath, IProgress<int> progress = null)
     {
         using ZipArchive za = ZipFile.OpenRead(zipFilePath);
 
+        int totalFiles = za.Entries.Count;
+        int processedFiles = 0;
+        
         foreach (ZipArchiveEntry entry in za.Entries)
         {
+            
             string resolvedPath = Path.Combine(targetDir, entry.FullName);
 
             if (string.IsNullOrEmpty(entry.Name))
@@ -82,6 +86,13 @@ public class BackupService
                     Directory.CreateDirectory(parentFolder);
                 
                 entry.ExtractToFile(resolvedPath, overwrite: true);
+                
+                processedFiles++;
+                if (processedFiles > 0)
+                {
+                    int percentage = (processedFiles * 100) / totalFiles;
+                    progress?.Report(percentage);
+                }
             }
         }
         
