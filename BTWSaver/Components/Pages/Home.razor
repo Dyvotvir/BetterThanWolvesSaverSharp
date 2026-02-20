@@ -1,0 +1,212 @@
+﻿@page "/"
+@using BTWSaver.Config
+@using BTWSaver.Services
+@inject BTWSaver.Config.ConfigManager _configManager
+
+<div class="scene">
+    <div class="buttons-field">
+        <div class="apply-btn-field">
+            <div class="action-btn apply-btn" @onclick="Apply">Apply</div>
+        </div>
+        
+        <div class="overwrite-btn-field">
+            <div class="action-btn overwrite-btn" @onclick="Overwrite">Overwrite</div>
+        </div>
+        
+        <div class="create-new-btn-field">
+            <div class="action-btn create-new-file-btn" @onclick="CreateNew">Create New File</div>
+        </div>
+        
+        <div class="delete-btn-field">
+            <div class="action-btn delete-btn">Delete</div>
+        </div>
+        
+        <div class="delete-all-btn-field">
+            <div class="action-btn delete-all-btn">Delete All</div>
+        </div>
+    </div>
+        
+</div>
+
+@code {
+    [CascadingParameter] 
+    public MainLayout ParentLayout { get; set; }
+    
+    private int _lastIndex;
+    private string? _saveFilePath;
+    private string? _saveFileName;
+
+    protected override void OnInitialized()
+    {
+        LoadSettings();
+    }
+
+    private void Apply()
+    {
+        if (_lastIndex == 0)
+            return;
+
+        string worldToWipe = ParentLayout.ChosenSaveFilePath;
+        if (Directory.Exists(worldToWipe))
+        {
+            Directory.Delete(worldToWipe, true);
+        }
+        
+        BackupService.UnZip(ParentLayout.ChosenSaveFilePath, GetPathToLastZipFile());
+    }
+
+    private void Overwrite()
+    {
+        if (_lastIndex == 0) return;
+
+        string lastZipFilePath = GetPathToLastZipFile();
+        
+        if (File.Exists(lastZipFilePath))
+            File.Delete(lastZipFilePath);
+        
+        BackupService.Zip(ParentLayout.ChosenSaveFilePath, GetPathToLastZipFile());
+    }
+
+    private void CreateNew()
+    {
+        LoadSettings();
+        string newZipFileName = (_lastIndex == 0) ? _saveFileName + ".zip" 
+            : _saveFileName + " (" + (_lastIndex + 1) + ")" + ".zip";
+        string pathToZipInto = Path.Combine(_configManager.ParentPath, newZipFileName);
+        
+        BackupService.Zip(ParentLayout.ChosenSaveFilePath, pathToZipInto);
+        _lastIndex++;
+
+        SaveSettings();
+    }
+
+    private string? GetPathToLastZipFile()
+    {
+        if (GetLastZipFileName() == null)
+            return null;
+        return Path.Combine(_configManager.ParentPath, GetLastZipFileName());
+    }
+
+    private string? GetLastZipFileName()
+    {
+        if (_lastIndex == 0)
+            return null;
+        
+        return (_lastIndex == 1) ? _saveFileName + ".zip" : $"{_saveFileName} ({_lastIndex}).zip";
+    }
+
+    private void LoadSettings()
+    {
+        string? lastOpenedFilePath = _configManager.GetProperty("lastOpenedFilePath");
+        if (lastOpenedFilePath != null) //It can be null when no even lastOpenedFilePath is present
+        {
+            string loadedSavePath = _saveFileName == null ? lastOpenedFilePath
+                : _configManager.GetProperty(_saveFileName + ".targetSaveFilePath");
+            _saveFilePath = loadedSavePath;
+            _saveFileName = Path.GetFileName(_saveFilePath);
+        }
+        
+        _lastIndex = int.Parse(_configManager.GetProperty(_saveFileName + ".lastIndex", "0"));
+    }
+
+    private void SaveSettings()
+    {
+        _configManager.SetProperty("lastOpenedFilePath", ParentLayout.ChosenSaveFilePath);
+        _configManager.SetProperty(_saveFileName + ".lastIndex", _lastIndex.ToString());
+        _configManager.SetProperty(_saveFileName + ".targetSaveFilePath", _saveFilePath);
+        
+        _configManager.Save();
+    }
+    
+
+}
+
+<style>
+    .scene { display: flex; flex-grow: 1; flex-direction: column; justify-content: center; align-items: center; width: 100%; height: 100%; }
+    
+    .buttons-field {
+        background-color: #1a1d20;
+        width: 85%;
+        height: 85%;
+        border-radius: 10px;
+        
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 50px;
+    }
+    
+    .action-btn {
+        width: 150px;
+        padding: 8px;
+        
+        text-align: center;
+        border-radius: 5px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        color: black;
+    }
+
+    .action-btn:active {
+        transform: scale(0.95);
+    }
+    
+    .apply-btn {
+        background-color: #1eb31e;
+    }
+    
+    .apply-btn:hover {
+        background-color: #00FF00FF;
+        box-shadow: 0 4px 20px rgb(255, 249, 2, 0.8);
+    }
+
+    .overwrite-btn {
+        background-color: #b36d1e;
+    }
+
+    .overwrite-btn:hover {
+        background-color: #ff8000;
+        box-shadow: 0 4px 20px rgba(255, 214, 79, 0.8);
+    }
+
+    .create-new-file-btn {
+        background-color: #239797;
+    }
+
+    .create-new-file-btn:hover {
+        background-color: #02ffea;
+        box-shadow: 0 4px 20px rgba(166, 156, 255, 0.8);
+    }
+
+    .delete-btn {
+        background-color: #bf2d2d;
+    }
+
+    .delete-btn:hover {
+        background-color: #ff7272;
+        box-shadow: 0 4px 20px rgba(255, 0, 0, 0.8);
+    }
+
+    .delete-all-btn {
+        background: radial-gradient(circle, #ff6969, #000000);
+        box-shadow: inset 0 0 0 200px #935e5e;
+        transition: box-shadow 1s ease;
+    }
+
+    .delete-all-btn:hover {
+        box-shadow: inset 0 0 0 200px transparent, 0 4px 20px rgba(255, 255, 255, 0.8);
+        animation: shake-animation 0.5s infinite;
+    }
+    
+    @@keyframes shake-animation {
+        0% {transform: translateX(0);}
+        20% {transform: translateX(-1px);}
+        40% {transform: translateX(0);}
+        60% {transform: translateX(-1px);}
+        80% {transform: translateX(0);}
+        100% {transform: translateX(-1px);}
+    }
+    
+</style>

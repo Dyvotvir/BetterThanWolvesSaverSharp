@@ -1,0 +1,187 @@
+﻿@using BTWSaver.Config
+@using CommunityToolkit.Maui.Core.Primitives
+@using CommunityToolkit.Maui.Storage
+@inherits LayoutComponentBase
+@inject BTWSaver.Config.ConfigManager _configManager
+
+<div class="master-layout">
+        <nav class="side-panel">
+            <div class="btw-text">Better Than Wolves
+                <p class="saver-text">Saver</p>
+            </div>
+            <div class="choose-save-file-btn" @onclick="PickAFolder">Choose save file</div>
+            <div class="navigation-button active">
+                <div class="nav-text">@ChosenSaveFileName</div>
+                <span class="delete-cross-btn">&times;</span>
+            </div>
+        </nav>
+    
+        <div class="content-area">
+            <CascadingValue Value="this">
+                <main>
+                    @Body
+                </main>
+            </CascadingValue>
+        </div>
+        
+
+</div>
+
+@code {
+    public string? ChosenSaveFilePath;
+    public string? ChosenSaveFileName = "Not chosen";
+
+    protected override void OnInitialized()
+    {
+        ChosenSaveFilePath = _configManager.GetProperty("lastOpenedFilePath");
+        ChosenSaveFileName = Path.GetFileName(ChosenSaveFilePath);
+    }
+    
+    private async Task PickAFolder()
+    {
+        try
+        {
+            if (ChosenSaveFileName != null)
+                SaveSettings();
+            
+            var result = await FolderPicker.Default.PickAsync(@"C:\Users\Name\AppData\Roaming\");
+            ChosenSaveFilePath = result.Folder.Path;
+            ChosenSaveFileName = Path.GetFileName(ChosenSaveFilePath);
+            
+            
+            SaveSettings();
+        }
+        catch
+        {
+            
+        }
+        
+
+    }
+
+    private void SaveSettings()
+    {
+        _configManager.SetProperty("lastOpenedFilePath", ChosenSaveFilePath);
+        _configManager.SetProperty(ChosenSaveFileName + ".targetSaveFilePath", ChosenSaveFilePath);
+        _configManager.Save();
+    }
+
+}
+
+<style>
+    body {font-family: 'Segoe UI', Tahoma, sans-serif; color: #c9d1d9; }
+
+    .content-area {
+        background: radial-gradient(circle at top left, #69a8ff, #021983);
+        display: flex;
+        flex: 1;
+    }
+    
+    .master-layout {display: flex; height: 100vh; overflow: hidden}
+    
+    .side-panel {
+        width: 260px; 
+        border-right: 1px solid #0a53be;
+        display: flex; 
+        flex-direction: column; 
+        background-color: #2e2e2e;
+        padding-top: 20px;
+    }
+    
+    .btw-text {
+        color: #58a6ff;
+        font-weight: 900;
+        font-size: 20px;
+        letter-spacing: 2px;
+        text-align: center;
+        margin-bottom: 30px;
+        text-shadow: 0 0 10px rgba(88, 166, 255, 0.3);
+    }
+
+    @@keyframes pulse-glow {
+        0% {color: #3FB95066; text-shadow: 0 0 5px rgba(63, 185, 80, 0.4); }
+        50% {color: #3FB950CC; text-shadow: 0 0 20px rgba(63, 185, 80, 0.8); }
+        100% {color: #3FB95066; text-shadow: 0 0 5px rgba(63, 185, 80, 0.4); }
+    }
+    .saver-text { animation: pulse-glow 3s infinite; }
+
+    .choose-save-file-btn {
+        color: #dfe1e5;
+        background-color: #2b2d30; 
+        border-left: 3px solid transparent;
+    }
+
+    .choose-save-file-btn {
+        margin: 15px; 
+        padding: 15px 25px;
+        width: auto;
+        text-align: center; 
+        border-radius: 5px; 
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        color: #dfe1e5;
+        background-color: #535557;
+        cursor: pointer;
+    }
+
+    .choose-save-file-btn:hover {
+        background-color: #75787a;
+        color: #ffffff;
+        box-shadow: 0 4px 20px rgba(53, 116, 240, 0.4);
+    }
+
+    .choose-save-file-btn:active {
+        transform: scale(0.95); 
+    }
+
+    .navigation-button {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        
+        text-decoration: none;
+        padding: 10px 15px;
+        color: #8b949e;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        border-left: 3px solid transparent;
+        cursor: pointer; 
+    }
+
+    .navigation-button:hover {
+        background-color: #21262d; color: #ffffff
+    }
+
+    .navigation-button.active {
+        border-left-color: #58a6ff;
+        background-color: #1f2428;
+        color: #58f6ff;
+    }
+    
+    .delete-cross-btn {
+        color: #6e7681;
+        font-size: 20px;
+        font-weight: bold;
+        padding: 0 8px 2px 8px;
+        border-radius: 4px;
+        line-height: 1; 
+        transition: all 0.2s ease;
+    }
+    
+    .delete-cross-btn:hover {
+        color: #ff5555; 
+        background-color: rgba(255, 85, 85, 0.1); 
+    }
+
+    .navigation-button:hover {
+        background-color: #21262d;
+        color: #ffffff;
+    }
+    
+    .navigation-button.active {
+        border-left-color: #58a6ff;
+        background-color: #1f2428;
+        color: #58a6ff;
+    }
+</style>
